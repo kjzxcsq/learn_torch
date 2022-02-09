@@ -1,7 +1,9 @@
 # Import necessary packages.
+from tkinter import W
 import numpy as np
 import torch
 import torch.nn as nn
+import torchvision
 import torchvision.transforms as transforms
 from PIL import Image
 # "ConcatDataset" and "Subset" are possibly useful when doing semi-supervised learning.
@@ -107,6 +109,10 @@ def get_pseudo_labels(dataset, model, threshold=0.65):
     # Define softmax function.
     softmax = nn.Softmax(dim=-1)
 
+    dataloader = DataLoader(dataset, shuffle=1)
+    step = 0
+    index = []
+
     # Iterate over the dataset by batches.
     for batch in tqdm(dataloader):
         img, _ = batch
@@ -121,18 +127,25 @@ def get_pseudo_labels(dataset, model, threshold=0.65):
 
         # ---------- TODO ----------
         # Filter the data and construct a new dataset.
+        # print(probs)
+        if probs[0][torch.argmax(probs)] > threshold:
+            index.append(step)
+        step = step + 1
 
     # # Turn off the eval mode.
     model.train()
-    return dataset
+    return Subset(dataset, index)
 
 
 # "cuda" only when GPUs are available.
 device = "cuda" if torch.cuda.is_available() else "cpu"
+print("device:{}".format(device))
 
 # Initialize a model, and put it on the device specified.
-model = Classifier().to(device)
-model.device = device
+# model = Classifier().to(device)
+# model.device = device
+model = torchvision.models.resnet18(pretrained=True)
+model = model.cuda()
 
 # For the classification task, we use cross-entropy as the measurement of performance.
 criterion = nn.CrossEntropyLoss()
@@ -269,7 +282,7 @@ for batch in tqdm(test_loader):
 
 
 # Save predictions into the file.
-with open("predict.csv", "w") as f:
+with open("./HW3/predict.csv", "w") as f:
 
     # The first row must be "Id, Category"
     f.write("Id,Category\n")
